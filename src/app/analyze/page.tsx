@@ -7,9 +7,20 @@ import ToneSelector from '@/components/ToneSelector';
 import SenioritySelector from '@/components/SenioritySelector';
 import LanguageSelector from '@/components/LanguageSelector';
 
+// Helper for safe JSON parsing
+async function safeJson(response: Response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error('JSON Parse Error. Raw response:', text.slice(0, 500));
+    throw new Error(`Server returned invalid JSON (Status: ${response.status}). See console for details.`);
+  }
+}
+
 export default function AnalyzePage() {
   const router = useRouter();
-  const [step, setStep] = useState(0); // 0: CV, 1: CL, 2: Final
+  const [step, setStep] = useState(0); 
   const [cvText, setCvText] = useState('');
   const [cvFileName, setCvFileName] = useState('');
   const [coverLetterText, setCoverLetterText] = useState('');
@@ -22,17 +33,8 @@ export default function AnalyzePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   
-  const handleNext = () => {
-    if (step < 2) setStep(step + 1);
-  };
-
-  const handleBack = () => {
-    if (step === 0) {
-        router.push('/');
-    } else {
-        setStep(step - 1);
-    }
-  };
+  const handleNext = () => { if (step < 2) setStep(step + 1); };
+  const handleBack = () => { step === 0 ? router.push('/') : setStep(step - 1); };
 
   const handlePdfUpload = async (file: File, type: 'cv' | 'cl') => {
     const formData = new FormData();
@@ -41,30 +43,28 @@ export default function AnalyzePage() {
     setIsExtracting(true);
     
     try {
+      // Try primary endpoint
       let response = await fetch('/api/extract-pdf', { method: 'POST', body: formData });
       
-      // Fallback hvis første feiler
-      if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+      // If primary fails (status error or HTML content), try fallback
+      const contentType = response.headers.get('content-type');
+      if (!response.ok || !contentType?.includes('application/json')) {
+        console.warn('Primary PDF extraction failed, trying fallback...');
         response = await fetch('/api/upload-document', { method: 'POST', body: formData });
       }
 
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        if (response.ok) {
-          if (type === 'cv') { setCvText(data.text); setCvFileName(file.name); }
-          else { setCoverLetterText(data.text); setClFileName(file.name); }
-        } else {
-          alert(`Extraction Error: ${data.details || data.error || 'Server error'}`);
-        }
+      // Safe parse
+      const data = await safeJson(response);
+
+      if (response.ok) {
+        if (type === 'cv') { setCvText(data.text); setCvFileName(file.name); }
+        else { setCoverLetterText(data.text); setClFileName(file.name); }
       } else {
-        const text = await response.text();
-        console.error('Non-JSON response:', text);
-        alert(`Server Error (${response.status}): Failed to read PDF. Try pasting text manually.`);
+        alert(`Extraction Error: ${data.details || data.error || 'Server error'}`);
       }
-    } catch (err) {
-      console.error('PDF error:', err);
-      alert('Network Error: Could not connect to PDF service.');
+    } catch (err: any) {
+      console.error('PDF Upload Error:', err);
+      alert(err.message || 'Failed to upload PDF');
     } finally {
       setIsExtracting(false);
     }
@@ -82,17 +82,13 @@ export default function AnalyzePage() {
           body: JSON.stringify({ url: jobUrl }),
         });
         
-        if (extractRes.ok && extractRes.headers.get('content-type')?.includes('application/json')) {
-          const extractedData = await extractRes.json();
-          finalJobDescription = extractedData.content;
-        } else {
-          console.warn('URL extraction failed, using manual text if available');
+        if (extractRes.ok) {
+           const data = await safeJson(extractRes);
+           finalJobDescription = data.content;
         }
       }
 
-      if (!finalJobDescription && !urlOnly) {
-        throw new Error('Please provide a valid Job URL first.');
-      }
+      if (!finalJobDescription && !urlOnly) throw new Error('Please provide a valid Job URL first.');
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
@@ -101,24 +97,18 @@ export default function AnalyzePage() {
           cvText: urlOnly ? 'URL ONLY ANALYSIS' : cvText,
           applicationText: urlOnly ? '' : coverLetterText,
           jobDescription: finalJobDescription || 'URL ONLY',
-          tone: tone,
-          seniority: seniority,
-          language: language,
+          tone, seniority, language,
         }),
       });
       
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const results = await response.json();
-        if (!response.ok) throw new Error(results.error || 'Analysis failed');
-        sessionStorage.setItem('jobfit_analysis_result', JSON.stringify(results));
-        router.push('/results');
-      } else {
-        throw new Error(`Server Error (${response.status}): The analysis service is currently unavailable.`);
-      }
+      const results = await safeJson(response);
+      if (!response.ok) throw new Error(results.error || 'Analysis failed');
+      
+      sessionStorage.setItem('jobfit_analysis_result', JSON.stringify(results));
+      router.push('/results');
     } catch (error: any) {
       console.error('Analysis failed:', error);
-      alert(error.message || 'An error occurred during analysis');
+      alert(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -128,7 +118,7 @@ export default function AnalyzePage() {
     <div className="flex flex-col items-center justify-center min-h-full bg-background px-4 py-12">
       <div className="w-full max-w-2xl space-y-8">
         <div className="text-center mb-12">
-          <h1 className="text-2xl font-bold tracking-tighter text-black dark:text-white uppercase">jobfit v1.1</h1>
+          <h1 className="text-2xl font-bold tracking-tighter text-black dark:text-white uppercase">jobfit v1.2 (Safe Mode)</h1>
         </div>
         <div className="relative bg-white dark:bg-[#2f2f2f] border border-[#e5e5e5] dark:border-[#383838] rounded-[28px] chat-input-shadow overflow-hidden">
           <div className="p-6 border-b border-[#f0f0f0] dark:border-[#383838]">
