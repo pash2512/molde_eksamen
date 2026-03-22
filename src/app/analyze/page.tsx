@@ -12,7 +12,7 @@ async function safeJson(response: Response) {
   const text = await response.text();
   try {
     return JSON.parse(text);
-  } catch (e) {
+  } catch {
     console.error('JSON Parse Error. Raw response:', text.slice(0, 500));
     throw new Error(`Server returned invalid JSON (Status: ${response.status}). See console for details.`);
   }
@@ -34,7 +34,13 @@ export default function AnalyzePage() {
   const [isExtracting, setIsExtracting] = useState(false);
   
   const handleNext = () => { if (step < 2) setStep(step + 1); };
-  const handleBack = () => { step === 0 ? router.push('/') : setStep(step - 1); };
+  const handleBack = () => { 
+    if (step === 0) {
+      router.push('/');
+    } else {
+      setStep(step - 1);
+    }
+  };
 
   const handlePdfUpload = async (file: File, type: 'cv' | 'cl') => {
     const formData = new FormData();
