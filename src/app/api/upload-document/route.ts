@@ -1,66 +1,43 @@
 import { NextResponse } from 'next/server';
 
-// Robust polyfill for DOMMatrix - MUST be at the absolute top
-if (typeof (globalThis as any).DOMMatrix === 'undefined') {
-    const MockMatrix = class DOMMatrix {
-        constructor() {}
-        static fromFloat64Array() { return new MockMatrix(); }
-        static fromFloat32Array() { return new MockMatrix(); }
-    };
-    (global as any).DOMMatrix = MockMatrix;
-    (globalThis as any).DOMMatrix = MockMatrix;
-}
-
 export async function POST(request: Request) {
+  // 1. Definer DOMMatrix med en gang inne i funksjonen
+  if (typeof (globalThis as any).DOMMatrix === 'undefined') {
+    (globalThis as any).DOMMatrix = class {
+      static fromFloat64Array() { return new (globalThis as any).DOMMatrix(); }
+      static fromFloat32Array() { return new (globalThis as any).DOMMatrix(); }
+    };
+  }
+
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const documentType = formData.get('documentType') as string;
 
-    if (!file) {
-      return NextResponse.json({ error: 'File is required' }, { status: 400 });
-    }
+    if (!file) return NextResponse.json({ error: 'File is required' }, { status: 400 });
 
     const bytes = await file.arrayBuffer();
-    
-    // Safety check inside handler
-    if (typeof (globalThis as any).DOMMatrix === 'undefined') {
-        const MockMatrix = class DOMMatrix {
-            constructor() {}
-            static fromFloat64Array() { return new MockMatrix(); }
-            static fromFloat32Array() { return new MockMatrix(); }
-        };
-        (global as any).DOMMatrix = MockMatrix;
-        (globalThis as any).DOMMatrix = MockMatrix;
-    }
+    const buffer = Buffer.from(bytes);
 
-    // Dynamic import to ensure polyfill is applied
-    const pdfLib = await import('pdf-parse');
-    const PDFParse = pdfLib.PDFParse || (pdfLib.default ? (pdfLib.default as any).PDFParse : null) || pdfLib.default;
+    // 2. Forenklet import som TypeScript godtar
+    const pdf = await import('pdf-parse');
+    const pdfModule = pdf as any;
+    const PDFParse = pdfModule.PDFParse || pdfModule.default?.PDFParse || pdfModule.default;
 
     if (!PDFParse) {
-        throw new Error('PDF parsing library failed to load.');
+      throw new Error('Could not find PDFParse in the imported module.');
     }
 
     try {
-        const buffer = Buffer.from(bytes);
         let text = "";
-
         if (typeof PDFParse === 'function' && !PDFParse.prototype?.getText) {
-            const data = await (PDFParse as any)(buffer);
+            const data = await PDFParse(buffer);
             text = data.text || "";
         } else {
-            const parser = new (PDFParse as any)({
-                data: buffer,
-                verbosity: 0 
-            });
-
+            const parser = new PDFParse({ data: buffer, verbosity: 0 });
             const result = await parser.getText();
             text = result.text || "";
-
-            if (typeof (parser as any).destroy === 'function') {
-                await (parser as any).destroy();
-            }
+            if (typeof parser.destroy === 'function') await parser.destroy();
         }
 
         return NextResponse.json({ 
@@ -70,17 +47,11 @@ export async function POST(request: Request) {
 
     } catch (parseError: any) {
         console.error('Extraction failed:', parseError);
-        return NextResponse.json({ 
-            error: 'Parsing Error', 
-            details: parseError.message 
-        }, { status: 500 });
+        return NextResponse.json({ error: parseError.message }, { status: 500 });
     }
 
   } catch (error: any) {
     console.error('Global Error:', error);
-    return NextResponse.json({ 
-        error: 'Global Error', 
-        details: error.message 
-    }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
