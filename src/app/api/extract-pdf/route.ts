@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-  // 1. Definer DOMMatrix med en gang inne i funksjonen
   if (typeof (globalThis as any).DOMMatrix === 'undefined') {
     (globalThis as any).DOMMatrix = class {
       static fromFloat64Array() { return new (globalThis as any).DOMMatrix(); }
@@ -12,26 +11,24 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
-
     if (!file) return NextResponse.json({ error: 'No file' }, { status: 400 });
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // 2. Forenklet import som TypeScript godtar
+    // 1. Importer bibliotekene
     const pdf = await import('pdf-parse');
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
     
-    // Vi bruker 'any' her for å slippe type-feil under bygging hos Vercel
+    // 2. Tving biblioteket til å bruke en ekstern "worker" fra nettet
+    // Dette stopper "Cannot find module pdf.worker.mjs" feilen på Vercel
+    const pdfjsVersion = "5.4.296"; 
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsVersion}/legacy/build/pdf.worker.min.mjs`;
+
     const pdfModule = pdf as any;
     const PDFParse = pdfModule.PDFParse || pdfModule.default?.PDFParse || pdfModule.default;
 
-    if (!PDFParse) {
-      throw new Error('Kunne ikke laste PDF-biblioteket');
-    }
-
     let text = "";
-    
-    // 3. Kjør ekstraksjonen
     if (typeof PDFParse === 'function' && !PDFParse.prototype?.getText) {
       const data = await PDFParse(buffer);
       text = data.text;
@@ -46,6 +43,6 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('Extraction error:', error);
-    return NextResponse.json({ error: error.message || 'Parsing feilet' }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

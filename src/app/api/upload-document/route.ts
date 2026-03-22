@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-  // 1. Definer DOMMatrix med en gang inne i funksjonen
   if (typeof (globalThis as any).DOMMatrix === 'undefined') {
     (globalThis as any).DOMMatrix = class {
       static fromFloat64Array() { return new (globalThis as any).DOMMatrix(); }
@@ -19,14 +18,18 @@ export async function POST(request: Request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // 2. Forenklet import som TypeScript godtar
+    // 1. Importer bibliotekene
     const pdf = await import('pdf-parse');
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    
+    // 2. Tving biblioteket til å bruke en ekstern "worker" fra nettet
+    const pdfjsVersion = "5.4.296"; 
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsVersion}/legacy/build/pdf.worker.min.mjs`;
+
     const pdfModule = pdf as any;
     const PDFParse = pdfModule.PDFParse || pdfModule.default?.PDFParse || pdfModule.default;
 
-    if (!PDFParse) {
-      throw new Error('Could not find PDFParse in the imported module.');
-    }
+    if (!PDFParse) throw new Error('Could not find PDFParse in module.');
 
     try {
         let text = "";
