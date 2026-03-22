@@ -1,14 +1,7 @@
 import { NextResponse } from 'next/server';
+import PDFParse from 'pdf-parse';
 
 export async function POST(request: Request) {
-  // 1. Polyfill for DOMMatrix
-  if (typeof (globalThis as any).DOMMatrix === 'undefined') {
-    (globalThis as any).DOMMatrix = class {
-      static fromFloat64Array() { return new (globalThis as any).DOMMatrix(); }
-      static fromFloat32Array() { return new (globalThis as any).DOMMatrix(); }
-    };
-  }
-
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -17,12 +10,8 @@ export async function POST(request: Request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // 2. Bruk eval('require') for å tvinge Vercel til å laste biblioteket riktig
-    // Dette er en "magisk" linje som ofte fikser worker-problemer på Vercel
-    const PDFParse = eval('require')('pdf-parse');
-
-    // 3. Kjør ekstraksjonen
-    // Vi bruker standard pdf-parse som er mest stabil
+    // Den originale pdf-parse (1.1.1) er en enkel funksjon
+    // Den fungerer perfekt på Vercel uten workers eller https-feil
     const data = await PDFParse(buffer);
     
     return NextResponse.json({ 
@@ -30,9 +19,9 @@ export async function POST(request: Request) {
     });
 
   } catch (error: any) {
-    console.error('PDF Extraction Error:', error);
+    console.error('PDF Error:', error);
     return NextResponse.json({ 
-      error: 'Kunne ikke lese PDF-filen på serveren.',
+      error: 'Serveren kunne ikke lese PDF-en.',
       details: error.message 
     }, { status: 500 });
   }
