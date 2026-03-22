@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-  // 1. Definer DOMMatrix med en gang inne i funksjonen for å stoppe krasj
+  // 1. Definer DOMMatrix med en gang inne i funksjonen
   if (typeof (globalThis as any).DOMMatrix === 'undefined') {
     (globalThis as any).DOMMatrix = class {
       static fromFloat64Array() { return new (globalThis as any).DOMMatrix(); }
@@ -18,27 +18,34 @@ export async function POST(request: Request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // 2. Bruk dynamisk import slik at biblioteket ikke lastes før nå
+    // 2. Forenklet import som TypeScript godtar
     const pdf = await import('pdf-parse');
-    const parse = pdf.PDFParse || (pdf.default ? (pdf.default as any).PDFParse : null) || pdf.default;
+    
+    // Vi bruker 'any' her for å slippe type-feil under bygging hos Vercel
+    const pdfModule = pdf as any;
+    const PDFParse = pdfModule.PDFParse || pdfModule.default?.PDFParse || pdfModule.default;
+
+    if (!PDFParse) {
+      throw new Error('Kunne ikke laste PDF-biblioteket');
+    }
 
     let text = "";
     
-    // 3. Sjekk om det er mehmet-kozan versjonen (klasse) eller standard (funksjon)
-    if (typeof parse === 'function' && !parse.prototype?.getText) {
-      const data = await (parse as any)(buffer);
+    // 3. Kjør ekstraksjonen
+    if (typeof PDFParse === 'function' && !PDFParse.prototype?.getText) {
+      const data = await PDFParse(buffer);
       text = data.text;
     } else {
-      const parser = new (parse as any)({ data: buffer, verbosity: 0 });
+      const parser = new PDFParse({ data: buffer, verbosity: 0 });
       const result = await parser.getText();
       text = result.text;
-      if (typeof (parser as any).destroy === 'function') await (parser as any).destroy();
+      if (typeof parser.destroy === 'function') await parser.destroy();
     }
 
     return NextResponse.json({ text: (text || "").trim() });
 
   } catch (error: any) {
     console.error('Extraction error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Parsing feilet' }, { status: 500 });
   }
 }
