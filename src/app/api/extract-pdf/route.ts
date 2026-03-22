@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import PDFParse from 'pdf-parse';
 
 export async function POST(request: Request) {
   try {
@@ -10,8 +9,9 @@ export async function POST(request: Request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Den originale pdf-parse (1.1.1) er en enkel funksjon
-    // Den fungerer perfekt på Vercel uten workers eller https-feil
+    // Vi bruker dynamic require inne i funksjonen for å unngå at Vercel 
+    // prøver å sjekke test-filene til biblioteket under bygging.
+    const PDFParse = require('pdf-parse');
     const data = await PDFParse(buffer);
     
     return NextResponse.json({ 
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('PDF Error:', error);
     return NextResponse.json({ 
-      error: 'Serveren kunne ikke lese PDF-en.',
+      error: 'Kunne ikke lese PDF.',
       details: error.message 
     }, { status: 500 });
   }
