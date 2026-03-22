@@ -11,20 +11,17 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
-    const documentType = formData.get('documentType') || 'unknown';
-    
     if (!file) return NextResponse.json({ error: 'Ingen fil' }, { status: 400 });
 
     const arrayBuffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
 
-    // Bruk det nye PDF.js biblioteket
-    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const pdfjs = await import('pdfjs-dist/build/pdf.mjs');
     const loadingTask = pdfjs.getDocument({
       data: uint8Array,
-      useSystemFonts: true,
-      disableFontFace: true,
-      verbosity: 0
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      useSystemFonts: true
     });
 
     const pdf = await loadingTask.promise;
@@ -39,11 +36,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ 
       text: fullText.trim(),
-      documentType: documentType
+      documentType: formData.get('documentType') || 'unknown'
     });
 
   } catch (error: any) {
-    console.error('Upload error:', error);
-    return NextResponse.json({ error: 'Serverfeil ved lesing av dokument.' }, { status: 500 });
+    console.error('API Error:', error);
+    return NextResponse.json({ 
+      error: 'Dokument-lesing feilet.', 
+      details: error.message 
+    }, { status: 500 });
   }
 }
