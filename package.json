@@ -12,11 +12,10 @@
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "pdf-parse": "1.1.1",
+    "pdfjs-dist": "4.4.168",
     "openai": "^6.27.0",
     "cheerio": "^1.2.0",
-    "@types/cheerio": "^0.22.35",
-    "@types/pdf-parse": "^1.1.5"
+    "@types/cheerio": "^0.22.35"
   },
   "devDependencies": {
     "typescript": "^5",
