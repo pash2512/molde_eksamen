@@ -1,15 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* Standard konfigurasjon for Next.js 15 */
-  eslint: {
-    // Dette skrur av kontrollen under bygging slik at appen din kommer på nett
-    ignoreDuringBuilds: true,
-  },
+  /* Standard konfigurasjon for Next.js 16 */
   typescript: {
-    // Dette gjør at TypeScript-feil ikke stopper byggingen
+    // Dette gjør at TypeScript-feil ikke stopper byggingen på Vercel
     ignoreBuildErrors: true,
-  }
+  },
 };
 
 export default nextConfig;
