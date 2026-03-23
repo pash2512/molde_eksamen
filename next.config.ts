@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
     // Dette gjør at TypeScript-feil ikke stopper byggingen på Vercel
     ignoreBuildErrors: true,
   },
+  serverExternalPackages: ['pdfjs-dist'],
 };
 
 export default nextConfig;

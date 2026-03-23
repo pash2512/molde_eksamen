@@ -16,12 +16,11 @@ export async function POST(request: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
 
-    const pdfjs = await import('pdfjs-dist/build/pdf.mjs');
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
     const loadingTask = pdfjs.getDocument({
       data: uint8Array,
-      useWorkerFetch: false,
-      isEvalSupported: false,
-      useSystemFonts: true
+      disableWorker: true,
+      verbosity: 0
     });
 
     const pdf = await loadingTask.promise;
