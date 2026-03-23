@@ -1,3 +1,8 @@
+# JobFit AI
+
+Link til github-bruker og applikasjon: https://github.com/pash2512/molde_eksamen
+Link til nettside: https://moldeeksamen.vercel.app/
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
