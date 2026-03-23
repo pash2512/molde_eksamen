@@ -1,36 +1,54 @@
 import { NextResponse } from 'next/server';
-import { PDFDocument } from 'pdf-lib';
 
 export async function POST(request: Request) {
+  if (typeof (globalThis as any).DOMMatrix === 'undefined') {
+    (globalThis as any).DOMMatrix = class {
+      static fromFloat64Array() { return new (globalThis as any).DOMMatrix(); }
+      static fromFloat32Array() { return new (globalThis as any).DOMMatrix(); }
+    };
+  }
+
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     if (!file) return NextResponse.json({ error: 'Ingen fil' }, { status: 400 });
 
     const arrayBuffer = await file.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+
+    // Vi bruker PDF.js i "legacy"-modus uten workers. 
+    // Dette er den mest stabile måten å hente tekst på Vercel.
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
     
-    // Last PDF med pdf-lib (ingen workers, ingen krasj)
-    const pdfDoc = await PDFDocument.load(arrayBuffer, { 
-      updateMetadata: false,
-      ignoreEncryption: true 
+    const loadingTask = pdfjs.getDocument({
+      data: uint8Array,
+      disableWorker: true, // Kritisk: Ingen bakgrunnsprosesser
+      verbosity: 0
     });
-    
-    // Hent metadata som en start
-    const title = pdfDoc.getTitle() || "";
-    const author = pdfDoc.getAuthor() || "";
-    const subject = pdfDoc.getSubject() || "";
-    
-    // Merk: pdf-lib er fantastisk for struktur, men for rå tekst-ekstraksjon 
-    // på Vercel uten workers er det best å bruke en kombinasjon.
-    // Vi sender tilbake en melding om at vi er klare.
-    
+
+    const pdf = await loadingTask.promise;
+    let fullText = "";
+
+    // Gå gjennom hver side og trekk ut teksten
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(" ");
+      fullText += pageText + "\n";
+    }
+
     return NextResponse.json({ 
-      text: `PDF lastet opp: ${file.name}. (Tittel: ${title} ${author})`,
-      pageCount: pdfDoc.getPageCount()
+      text: fullText.trim() || "Kunne ikke trekke ut tekst fra denne PDF-en.",
+      pageCount: pdf.numPages
     });
 
   } catch (error: any) {
-    console.error('PDF Error:', error);
-    return NextResponse.json({ error: 'Feil ved håndtering av PDF.' }, { status: 500 });
+    console.error('Extraction Error:', error);
+    return NextResponse.json({ 
+      error: 'Kunne ikke lese teksten i PDF-en.', 
+      details: error.message 
+    }, { status: 500 });
   }
 }
