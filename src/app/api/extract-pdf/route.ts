@@ -20,6 +20,11 @@ export async function POST(request: Request) {
     // Dette er den mest stabile måten å hente tekst på Vercel.
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
     
+    // Explicitly import the worker and set it to GlobalWorkerOptions
+    // This is required to solve the 'Cannot find module ... pdf.worker.mjs' error on Vercel
+    const pdfWorker = await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
+    (pdfjs as any).GlobalWorkerOptions.workerSrc = pdfWorker;
+    
     const loadingTask = pdfjs.getDocument({
       data: uint8Array,
       disableWorker: true, // Kritisk: Ingen bakgrunnsprosesser

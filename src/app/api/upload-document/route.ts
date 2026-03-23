@@ -17,6 +17,12 @@ export async function POST(request: Request) {
     const uint8Array = new Uint8Array(arrayBuffer);
 
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    
+    // Explicitly import the worker and set it to GlobalWorkerOptions
+    // This is required to solve the 'Cannot find module ... pdf.worker.mjs' error on Vercel
+    const pdfWorker = await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
+    (pdfjs as any).GlobalWorkerOptions.workerSrc = pdfWorker;
+
     const loadingTask = pdfjs.getDocument({
       data: uint8Array,
       disableWorker: true,
