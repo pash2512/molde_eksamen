@@ -72,22 +72,3 @@ Prosjektet har gitt meg en ny forståelse av programmering. Fokus har gått fra 
 Den viktigste lærdommen er at KI gjør utvikling raskere, men ikke nødvendigvis enklere. Det stiller nye krav til hvordan man tenker, jobber og vurderer kvalitet.
 KI fungerte som en avgjørende muliggjører for prosjektet, men det var den menneskelige vurderingen som avgjorde resultatet.
 
----
-### Tillegg: Tekniske detaljer og arkitektur (BFF og Sikkerhet)
-
-I tillegg til den overordnede prosessen, ble følgende tekniske prinsipper implementert for å sikre profesjonell standard og sikkerhet:
-
-**1. Arkitektonisk sikkerhet (BFF-mønster):**
-Applikasjonen bruker et "Backend-for-Frontend"-mønster. Dette betyr at all sensitiv logikk og OpenAI-nøkler er skjult på serversiden (Next.js API Routes). Brukeren kan aldri se API-nøklene ved å inspisere koden i nettleseren.
-
-**2. Miljøvariabler og Hemmeligheter:**
-Ingen API-nøkler er hardkodet. De injiseres i runtime via miljøvariabler (.env). Repositoriet er sikret via `.gitignore` slik at lokale hemmeligheter aldri lastes opp til GitHub.
-
-**3. Avansert funksjonalitet og UX:**
-For å gi brukeren mer kontroll ble det utviklet spesifikke komponenter:
-- `ToneSelector` og `SenioritySelector`: Lar brukeren styre KI-ens personlighet og nivå.
-- `UrlInput`: Gjør det mulig å hente stillingsannonser direkte fra nettet.
-- `MatchScoreCard` og `KeywordList`: Visualiserer data grafisk slik at analysen blir lettere å forstå.
-
-**4. Zero-Client Footprint:**
-Ved å kjøre PDF-parsing på serveren, slipper brukerens enhet å laste ned tunge biblioteker, noe som gir en raskere og mer stabil opplevelse.
